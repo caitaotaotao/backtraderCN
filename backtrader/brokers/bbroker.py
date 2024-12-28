@@ -239,10 +239,13 @@ class BackBroker(bt.BrokerBase):
         ('shortcash', True),
         ('fundstartval', 100.0),
         ('fundmode', False),
+        # 是否开启涨跌停板检查。若涨停则无法买入，若跌停则无法卖出
+        ('checklimit', False),
     )
 
     def __init__(self):
         super(BackBroker, self).__init__()
+        self.checklimit = False
         self._userhist = []
         self._fundhist = []
         # share_value, net asset value
@@ -318,6 +321,9 @@ class BackBroker(bt.BrokerBase):
     def set_coo(self, coo):
         '''Configure the Cheat-On-Open method to buy the close on order bar'''
         self.p.coo = coo
+
+    def set_checklimit(self, checklimit):
+        self.checklimit = checklimit
 
     def set_shortcash(self, shortcash):
         '''Configure the shortcash parameters'''
@@ -644,7 +650,7 @@ class BackBroker(bt.BrokerBase):
 
         self.set_cash(float(f[2]))
 
-    def buy(self, owner, data,
+    def buy(self, owner, data, limitype,
             size, price=None, plimit=None,
             exectype=None, valid=None, tradeid=0, oco=None,
             trailamount=None, trailpercent=None,
@@ -662,9 +668,24 @@ class BackBroker(bt.BrokerBase):
         order.addinfo(**kwargs)
         self._ocoize(order, oco)
 
-        return self.submit(order, check=_checksubmit)
+        # 判断是否为涨跌停板
+        if self.checklimit:
+            if limitype == 0:
+                upperlimit = order.data.close[0] * 1.1
+                if order.data.close[1] >= upperlimit:
+                    self.cancel(order)
+                else:
+                    self.submit(order, check=_checksubmit)
+            else:
+                upperlimit = order.data.close[0] * 1.2
+                if order.data.close[1] >= upperlimit:
+                    self.cancel(order)
+                else:
+                    self.submit(order, check=_checksubmit)
+        else:
+            self.submit(order, check=_checksubmit)
 
-    def sell(self, owner, data,
+    def sell(self, owner, data, limitype,
              size, price=None, plimit=None,
              exectype=None, valid=None, tradeid=0, oco=None,
              trailamount=None, trailpercent=None,
@@ -682,7 +703,22 @@ class BackBroker(bt.BrokerBase):
         order.addinfo(**kwargs)
         self._ocoize(order, oco)
 
-        return self.submit(order, check=_checksubmit)
+        # 判断是否为跌跌停板
+        if self.checklimit:
+            if limitype == 0:
+                downlimit = order.data.close[0] * 0.9
+                if order.data.close[1] <= downlimit:
+                    self.cancel(order)
+                else:
+                    self.submit(order, check=_checksubmit)
+            else:
+                downlimit = order.data.close[0] * 0.8
+                if order.data.close[1] <= downlimit:
+                    self.cancel(order)
+                else:
+                    self.submit(order, check=_checksubmit)
+        else:
+            self.submit(order, check=_checksubmit)
 
     def _execute(self, order, ago=None, price=None, cash=None, position=None,
                  dtcoc=None):
@@ -857,7 +893,7 @@ class BackBroker(bt.BrokerBase):
             exprice = order.created.pclose
         else:
             if not self.p.coo and order.data.datetime[0] <= order.created.dt:
-                return    # can only execute after creation time
+                return  # can only execute after creation time
 
             dtcoc = None
             exprice = popen

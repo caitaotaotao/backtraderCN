@@ -1,0 +1,4 @@
+** 20241228 更新记录 **
+1. 适配下单后检查是否次日处于涨跌停板状态
+    1） backbroker类新增属性check_limit控制是否检查涨跌停板状态，通过cerebro.broker.set_checklimit(True)进行设置
+    2）broker.buy(), broker.sell()新增涨跌停板类型参数limitype， 0：10%，1：20%，默认为10%

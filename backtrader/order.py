@@ -128,7 +128,7 @@ class OrderData(object):
     # thread making an append and with no need for a lock
 
     def __init__(self, dt=None, size=0, price=0.0, pricelimit=0.0, remsize=0,
-                 pclose=0.0, trailamount=0.0, trailpercent=0.0):
+                 pclose=0.0, trailamount=0.0, trailpercent=0.0, limitype=0):
 
         self.pclose = pclose
         self.exbits = collections.deque()  # for historical purposes
@@ -141,6 +141,7 @@ class OrderData(object):
         self.pricelimit = pricelimit
         self.trailamount = trailamount
         self.trailpercent = trailpercent
+        self.limitype = limitype  # 设置涨跌停板限制，0: 10%限制，1：20%限制
 
         if not pricelimit:
             # if no pricelimit is given, use the given price
@@ -186,6 +187,9 @@ class OrderData(object):
                               opened, openedvalue, openedcomm, pnl,
                               psize, pprice))
 
+    def set_limitype(self, limitype):
+        self.limitype = limitype
+
     def addbit(self, exbit):
         # Stores an ExecutionBit and recalculates own values from ExBit
         self.exbits.append(exbit)
@@ -229,6 +233,8 @@ class OrderBase(with_metaclass(MetaParams, object)):
         ('simulated', False),
         # To support historical order evaluation
         ('histnotify', False),
+        # 设置涨跌停限制参数: 0: 10%限制，1：20%限制
+        ('limitype', 0),
     )
 
     DAY = datetime.timedelta()  # constant for DAY order identification
